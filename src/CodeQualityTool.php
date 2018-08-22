@@ -1,37 +1,37 @@
 <?php
 
-namespace PHPComposter\GammaQualityTool;
+namespace QualityTool;
 
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\Config\Exception\FileLocatorFileNotFoundException;
 use Symfony\Component\Config\FileLocator;
+use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Process\Process;
-use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Question\ConfirmationQuestion;
+use Symfony\Component\Process\Process;
 use Symfony\Component\Yaml\Yaml;
 
 class CodeQualityTool extends Application
 {
-    const APP_NAME               = 'Smart Gamma Quality Tool';
-    const APP_VERSION            = 'v0.1.9';
-    const APP_CONFIG_FOLDER_PATH = '/app/Resources/GammaQualityTool';
-    const APP_CONFIG_FILE_NAME   = 'config.yml';
+    const APP_NAME = 'Smart Gamma Quality Tool';
+    const APP_VERSION = 'v0.1.9';
+    const APP_DEFAULT_CONFIG_FOLDER_PATH = '/app/Resources/GammaQualityTool';
+    const APP_DEFAULT_CONFIG_FILE_NAME = 'config.yml';
 
     /**
      * @var array
      */
     private $defaultConfigValues = [
-        'phpmd'             => true,
-        'lint'              => true,
-        'phpcs'             => true,
-        'phpcs_standard'    => 'PSR2',
-        'phpfixer'          => true,
+        'phpmd' => true,
+        'lint' => true,
+        'phpcs' => true,
+        'phpcs_standard' => 'PSR2',
+        'phpfixer' => true,
         'phpfixer_standard' => 'Symfony',
-        'phpspec'           => false,
-        'self_fix'          => true,
-        'exclude_dirs'      => '/app,/bin',
+        'phpspec' => false,
+        'self_fix' => true,
+        'exclude_dirs' => '/app,/bin',
     ];
 
     /**
@@ -79,21 +79,34 @@ class CodeQualityTool extends Application
      */
     private $workingDir;
 
-    public function __construct(array $commitedFiles, string $workingDir)
-    {
-        $this->commitedFiles = $commitedFiles;
-        $this->workingDir    = $workingDir;
+    /** @var string */
+    private $configFolderPath;
+
+    /** @var string */
+    private $configFileName;
+
+    public function __construct(
+        array $committedFiles,
+        string $workingDir,
+        string $configFolderPath = self::APP_DEFAULT_CONFIG_FOLDER_PATH,
+        string $configFileName = self::APP_DEFAULT_CONFIG_FILE_NAME
+    ) {
+        $this->commitedFiles = $committedFiles;
+        $this->workingDir = $workingDir;
+        $this->configFolderPath = $configFolderPath;
+        $this->configFileName = $configFileName;
+
         parent::__construct(self::APP_NAME, self::APP_VERSION);
     }
 
     private function filterExcludedFiles($files)
     {
-        $excludeDirs = explode(",", $this->getConfig('exclude_dirs'));
+        $excludeDirs = explode(',', $this->getConfig('exclude_dirs'));
 
         return array_filter(
             $files,
             function ($file) use ($excludeDirs) {
-                $expr = '!^' . $this->getWorkingDir() . '(' . implode('|', $excludeDirs) . ')/(.*?)$!';
+                $expr = '!^'.$this->getWorkingDir().'('.implode('|', $excludeDirs).')/(.*?)$!';
 
                 return preg_match('/(\.php)$/', $file) && !preg_match($expr, $file);
             }
@@ -103,8 +116,8 @@ class CodeQualityTool extends Application
     private function configure()
     {
         try {
-            $fileLocator        = new FileLocator($this->getWorkingDir() . self::APP_CONFIG_FOLDER_PATH);
-            $configFile         = $fileLocator->locate(self::APP_CONFIG_FILE_NAME);
+            $fileLocator = new FileLocator($this->getWorkingDir().self::APP_DEFAULT_CONFIG_FOLDER_PATH);
+            $configFile = $fileLocator->locate(self::APP_DEFAULT_CONFIG_FILE_NAME);
             $this->configValues = Yaml::parse(file_get_contents($configFile));
         } catch (FileLocatorFileNotFoundException $e) {
             $this->configValues = $this->defaultConfigValues;
@@ -120,14 +133,14 @@ class CodeQualityTool extends Application
      * @param InputInterface  $input
      * @param OutputInterface $output
      *
-     * @return void
      * @throws \Exception
      */
     public function doRun(InputInterface $input, OutputInterface $output)
     {
-        $this->isCodeStyleViolated = false;
-        $this->input               = $input;
-        $this->output              = $output;
+        $this->isCodeStyleViolatedByCS = false;
+        $this->isCodeStyleViolatedByFixer = false;
+        $this->input = $input;
+        $this->output = $output;
         $this->configure();
         $this->trackedFiles = $this->filterExcludedFiles($this->commitedFiles);
 
@@ -182,7 +195,7 @@ class CodeQualityTool extends Application
     private function phpLint(array $files): bool
     {
         $this->output->writeln('<info>Running PHPLint</info>');
-        $needle  = '/(\.php)|(\.inc)$/';
+        $needle = '/(\.php)|(\.inc)$/';
         $succeed = true;
         foreach ($files as $file) {
             if (!preg_match($needle, $file)) {
@@ -204,7 +217,7 @@ class CodeQualityTool extends Application
     {
         $this->output->writeln('<info>Running phpSpec tests</info>');
         $succeed = true;
-        $process        = new Process('vendor/bin/phpspec run');
+        $process = new Process('vendor/bin/phpspec run');
         $process->run();
         $this->output->writeln($process->getOutput());
 
@@ -219,8 +232,8 @@ class CodeQualityTool extends Application
     private function phPmd(array $files): bool
     {
         $this->output->writeln('<info>Checking code mess with PHPMD</info>');
-        $succeed  = true;
-        $fileRule = $this->getWorkingDir() . '/phpmd.xml';
+        $succeed = true;
+        $fileRule = $this->getWorkingDir().'/phpmd.xml';
 
         if (file_exists($fileRule)) {
             $rule = $fileRule;
@@ -248,7 +261,8 @@ class CodeQualityTool extends Application
         $this->output->writeln('<info>Checking code style by php-cs-fixer</info>');
         $succeed = true;
         foreach ($files as $file) {
-            $command = implode(' ',
+            $command = implode(
+                ' ',
                 [
                     'php',
                     './vendor/bin/php-cs-fixer',
@@ -257,7 +271,7 @@ class CodeQualityTool extends Application
                     '--verbose',
                     'fix',
                     $file,
-                    '--rules=@' . $this->getConfig('phpfixer_standard'),
+                    '--rules=@'.$this->getConfig('phpfixer_standard'),
                 ]
             );
             $phpCsFixer = new Process($command);
@@ -278,13 +292,14 @@ class CodeQualityTool extends Application
         $this->output->writeln('<info>Fixing code style by php-cs-fixer</info>');
         $succeed = true;
         foreach ($files as $file) {
-            $command = implode(' ',
+            $command = implode(
+                ' ',
                 [
                     'php',
                     './vendor/bin/php-cs-fixer',
                     'fix',
                     $file,
-                    '--rules=@' . $this->getConfig('phpfixer_standard'),
+                    '--rules=@'.$this->getConfig('phpfixer_standard'),
                 ]
             );
             $phpCsFixer = new Process($command);
@@ -310,12 +325,13 @@ class CodeQualityTool extends Application
         $succeed = true;
 
         foreach ($files as $file) {
-            $command = implode(' ',
+            $command = implode(
+                ' ',
                 [
                     'php',
                     './vendor/bin/phpcs',
                     '-n',
-                    '--standard=' . $this->getConfig('phpcs_standard'),
+                    '--standard='.$this->getConfig('phpcs_standard'),
                     $file,
                 ]
             );
@@ -338,9 +354,15 @@ class CodeQualityTool extends Application
 
     private function gitAddToCommitAutofixedFiles()
     {
+        $lockfile = '.git/index.lock';
+
+        if (file_exists($lockfile)) {
+            unlink($lockfile);
+        }
+
         foreach ($this->commitedFiles as $file) {
-            $this->output->writeln("git add " . $file);
-            exec("git add " . $file);
+            $this->output->writeln('git add '.$file);
+            exec('git add '.$file);
         }
     }
 
@@ -359,9 +381,9 @@ class CodeQualityTool extends Application
     {
         if (!array_key_exists($key, $this->configValues) && array_key_exists($key, $this->defaultConfigValues)) {
             $this->configValues[$key] = $this->defaultConfigValues[$key];
-            $defaultValueOutput       = is_bool($this->defaultConfigValues[$key]) ? var_export($this->defaultConfigValues[$key], 1) : $this->defaultConfigValues[$key];
+            $defaultValueOutput = is_bool($this->defaultConfigValues[$key]) ? var_export($this->defaultConfigValues[$key], 1) : $this->defaultConfigValues[$key];
             $this->output->writeln(
-                sprintf('<comment>Configuration key "%s" is not defined at %s, using default: %s</comment>', $key, self::APP_CONFIG_FOLDER_PATH . self::APP_CONFIG_FILE_NAME, $key . '=' . $defaultValueOutput)
+                sprintf('<comment>Configuration key "%s" is not defined at %s, using default: %s</comment>', $key, self::APP_DEFAULT_CONFIG_FOLDER_PATH.self::APP_DEFAULT_CONFIG_FILE_NAME, $key.'='.$defaultValueOutput)
             );
         }
     }
