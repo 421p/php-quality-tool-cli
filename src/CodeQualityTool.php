@@ -16,8 +16,6 @@ class CodeQualityTool extends Application
 {
     const APP_NAME = 'Smart Gamma Quality Tool';
     const APP_VERSION = 'v0.1.9';
-    const APP_DEFAULT_CONFIG_FOLDER_PATH = '/app/Resources/GammaQualityTool';
-    const APP_DEFAULT_CONFIG_FILE_NAME = 'config.yml';
 
     /**
      * @var array
@@ -88,8 +86,8 @@ class CodeQualityTool extends Application
     public function __construct(
         array $committedFiles,
         string $workingDir,
-        string $configFolderPath = self::APP_DEFAULT_CONFIG_FOLDER_PATH,
-        string $configFileName = self::APP_DEFAULT_CONFIG_FILE_NAME
+        string $configFolderPath,
+        string $configFileName
     ) {
         $this->commitedFiles = $committedFiles;
         $this->workingDir = $workingDir;
@@ -116,8 +114,8 @@ class CodeQualityTool extends Application
     private function configure()
     {
         try {
-            $fileLocator = new FileLocator($this->getWorkingDir().self::APP_DEFAULT_CONFIG_FOLDER_PATH);
-            $configFile = $fileLocator->locate(self::APP_DEFAULT_CONFIG_FILE_NAME);
+            $fileLocator = new FileLocator($this->getWorkingDir().$this->configFolderPath);
+            $configFile = $fileLocator->locate($this->configFileName);
             $this->configValues = Yaml::parse(file_get_contents($configFile));
         } catch (FileLocatorFileNotFoundException $e) {
             $this->configValues = $this->defaultConfigValues;
@@ -383,7 +381,7 @@ class CodeQualityTool extends Application
             $this->configValues[$key] = $this->defaultConfigValues[$key];
             $defaultValueOutput = is_bool($this->defaultConfigValues[$key]) ? var_export($this->defaultConfigValues[$key], 1) : $this->defaultConfigValues[$key];
             $this->output->writeln(
-                sprintf('<comment>Configuration key "%s" is not defined at %s, using default: %s</comment>', $key, self::APP_DEFAULT_CONFIG_FOLDER_PATH.self::APP_DEFAULT_CONFIG_FILE_NAME, $key.'='.$defaultValueOutput)
+                sprintf('<comment>Configuration key "%s" is not defined at %s, using default: %s</comment>', $key, $this->configFolderPath.$this->configFileName, $key.'='.$defaultValueOutput)
             );
         }
     }
