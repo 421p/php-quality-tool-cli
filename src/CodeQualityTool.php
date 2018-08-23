@@ -14,9 +14,6 @@ use Symfony\Component\Yaml\Yaml;
 
 class CodeQualityTool extends Application
 {
-    const APP_NAME = 'Smart Gamma Quality Tool';
-    const APP_VERSION = 'v0.1.9';
-
     /**
      * @var array
      */
@@ -83,18 +80,33 @@ class CodeQualityTool extends Application
     /** @var string */
     private $configFileName;
 
+    /** @var bool */
+    private $commitAutofixedFiles;
+
+    /** @var string */
+    private $name;
+
+    /** @var string */
+    private $version;
+
     public function __construct(
         array $committedFiles,
         string $workingDir,
         string $configFolderPath,
-        string $configFileName
+        string $configFileName,
+        bool $commitAutofixedFiles = true
     ) {
         $this->commitedFiles = $committedFiles;
         $this->workingDir = $workingDir;
         $this->configFolderPath = $configFolderPath;
         $this->configFileName = $configFileName;
+        $this->commitAutofixedFiles = $commitAutofixedFiles;
 
-        parent::__construct(self::APP_NAME, self::APP_VERSION);
+        $config = json_decode(file_get_contents(__DIR__.'/../composer.json'), true);
+        $this->name = $config['description'];
+        $this->version = $config['version'];
+
+        parent::__construct($this->name, $this->version);
     }
 
     private function filterExcludedFiles($files)
@@ -142,7 +154,7 @@ class CodeQualityTool extends Application
         $this->configure();
         $this->trackedFiles = $this->filterExcludedFiles($this->commitedFiles);
 
-        $this->output->writeln(sprintf('<fg=white;options=bold;bg=blue>%s %s</fg=white;options=bold;bg=blue>', self::APP_NAME, self::APP_VERSION));
+        $this->output->writeln(sprintf('<fg=white;options=bold;bg=blue>%s %s</fg=white;options=bold;bg=blue>', $this->name, $this->version));
         $this->output->writeln('<info>Fetching files</info>');
 
         if ($this->getConfig('lint') ? !$this->phpLint($this->trackedFiles) : false) {
@@ -164,7 +176,9 @@ class CodeQualityTool extends Application
             if ($helper->ask($this->input, $this->output, $question)) {
                 $this->output->writeln('<info>Autofixing code style</info>');
                 $this->fixCodeStylePhpFixer($this->trackedFiles);
-                $this->gitAddToCommitAutofixedFiles();
+                if ($this->commitAutofixedFiles) {
+                    $this->gitAddToCommitAutofixedFiles();
+                }
             }
 
             $question = new ConfirmationQuestion('Restart check again?', false);
@@ -178,7 +192,9 @@ class CodeQualityTool extends Application
             $question = new ConfirmationQuestion('Restart check again?', false);
 
             if ($helper->ask($this->input, $this->output, $question)) {
-                $this->gitAddToCommitAutofixedFiles();
+                if ($this->commitAutofixedFiles) {
+                    $this->gitAddToCommitAutofixedFiles();
+                }
                 $this->run();
             }
         }
@@ -352,12 +368,6 @@ class CodeQualityTool extends Application
 
     private function gitAddToCommitAutofixedFiles()
     {
-        $lockfile = '.git/index.lock';
-
-        if (file_exists($lockfile)) {
-            unlink($lockfile);
-        }
-
         foreach ($this->commitedFiles as $file) {
             $this->output->writeln('git add '.$file);
             exec('git add '.$file);

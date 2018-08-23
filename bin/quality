@@ -1,9 +1,9 @@
 #! /usr/bin/env php
 <?php
 
+use QualityTool\CliRunner;
+
 require __DIR__.'/../vendor/autoload.php';
 
-use QualityTool\Runner;
-
-$runner = new Runner();
+$runner = new CliRunner();
 $runner->run();
