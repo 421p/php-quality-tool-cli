@@ -16,13 +16,41 @@ As additional feature it allows use php-cs-fixer with auto fix of commited files
 
 ## Install 
 
-``
+```
 composer require --dev 421p/php-quality-tool-cli
-``
+```
 
 ## Usage
 
-1. php vendor/bin/quality
+```
+vendor/bin/quality
+```
+
+Available options:
+
+```
+--config-folder # Folder that contains config file.
+--config-file # Name of config file.
+--no-commit-autofixed # Disables adding autofixed files to commit
+```
+
+## Configuration
+
+Config example
+
+```yml
+# config.yml
+
+phpmd: true
+lint: true
+phpcs: true
+phpcs_standard: PSR2
+phpfixer: true
+phpfixer_standard: Symfony
+phpspec: false
+self_fix: true
+exclude_dirs: /app/bin
+```
 
 ## PHPCS & php-cs-fixer
 
@@ -32,3 +60,8 @@ Autofixed files will be automaticly added to the latest commit if no `--no-commi
 ## PHPMD
 
 The tool will scan PhpMD warning, but won't block the commit, but will output the list and prompt to rescan your commited file if you want to fix  via IDE some indicated warnings. 
+
+## Docker
+
+Option `--no-commit-autofixed` is useful when quality tool is invoked by git hook but running inside docker container
+Otherwise, 2 git processes may conflict.

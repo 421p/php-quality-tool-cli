@@ -3,7 +3,7 @@
 
 use QualityTool\CliRunner;
 
-require __DIR__.'/../vendor/autoload.php';
+require __DIR__.'/../autoload.php';
 
 $runner = new CliRunner();
 $runner->run();
